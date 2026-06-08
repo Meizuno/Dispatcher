@@ -4,7 +4,10 @@ version = "0.1.0"
 description = "Dispatcher"
 readme = "README.md"
 requires-python = ">=3.12"
-dependencies = []
+dependencies = [
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+]
 
 [project.optional-dependencies]
 dev = [
@@ -39,7 +42,7 @@ select = ["E", "W", "F", "I", "B", "C4", "UP", "SIM", "S", "PT", "RUF"]
 [tool.mypy]
 python_version = "3.12"
 strict = true
-plugins = []
+plugins = ["pydantic.mypy"]
 
 [[tool.mypy.overrides]]
 module = "tests.*"
