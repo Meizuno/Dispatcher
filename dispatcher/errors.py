@@ -1,4 +1,4 @@
-"""Base exceptions shared across all domain slices."""
+"""Domain exceptions."""
 
 from __future__ import annotations
 

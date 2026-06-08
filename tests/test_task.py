@@ -2,9 +2,9 @@ import uuid
 from datetime import UTC, datetime
 
 import pytest
-from dispatcher.shared.domain.errors import InvalidStateTransition
-from dispatcher.task.domain.models import Task, TaskPriority, TaskStatus
-from dispatcher.worker.domain.models import WorkerId
+from dispatcher.errors import InvalidStateTransition
+from dispatcher.task import Task, TaskPriority, TaskStatus
+from dispatcher.worker import WorkerId
 
 AT = datetime(2026, 1, 1, tzinfo=UTC)
 LATER = datetime(2026, 1, 2, tzinfo=UTC)

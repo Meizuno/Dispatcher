@@ -1,7 +1,7 @@
-"""Worker domain model: a node that executes tasks for the dispatcher.
+"""Worker model: a node that executes tasks for the dispatcher.
 
 Load is tracked as a count (``capacity`` / ``active_load``) rather than a list
-of task ids, so this slice stays decoupled from the task slice. The scheduler
+of task ids, so the worker stays decoupled from the task model. The scheduler
 reads ``free_slots`` / ``is_available`` to balance work across workers.
 """
 
@@ -13,7 +13,7 @@ from datetime import datetime
 from enum import StrEnum
 from typing import NewType
 
-from dispatcher.shared.domain.errors import DomainError, InvalidStateTransition
+from dispatcher.errors import DomainError, InvalidStateTransition
 
 WorkerId = NewType("WorkerId", uuid.UUID)
 

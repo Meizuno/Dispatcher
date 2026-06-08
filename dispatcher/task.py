@@ -1,4 +1,4 @@
-"""Task domain model: the unit of work the dispatcher hands to workers."""
+"""Task model: the unit of work the dispatcher hands to workers."""
 
 from __future__ import annotations
 
@@ -9,8 +9,8 @@ from datetime import datetime
 from enum import IntEnum, StrEnum
 from typing import Any, NewType
 
-from dispatcher.shared.domain.errors import InvalidStateTransition
-from dispatcher.worker.domain.models import WorkerId
+from dispatcher.errors import InvalidStateTransition
+from dispatcher.worker import WorkerId
 
 TaskId = NewType("TaskId", uuid.UUID)
 

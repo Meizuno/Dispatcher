@@ -1,8 +1,8 @@
 from datetime import UTC, datetime
 
 import pytest
-from dispatcher.shared.domain.errors import DomainError, InvalidStateTransition
-from dispatcher.worker.domain.models import Worker, WorkerStatus
+from dispatcher.errors import DomainError, InvalidStateTransition
+from dispatcher.worker import Worker, WorkerStatus
 
 AT = datetime(2026, 1, 1, tzinfo=UTC)
 LATER = datetime(2026, 1, 2, tzinfo=UTC)
