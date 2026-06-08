@@ -15,14 +15,14 @@ pip install -e ".[dev]"
 ```powershell
 ruff check .        # lint
 ruff format .       # format
-mypy src            # type check
+mypy dispatcher     # type check
 pytest              # tests
 ```
 
 ## Layout
 
 ```
-src/dispatcher/     # application package
-tests/              # test suite (mirrors src/)
+dispatcher/         # application package
+tests/              # test suite (mirrors dispatcher/)
 pyproject.toml      # dependencies + tool config
 ```
