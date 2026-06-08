@@ -8,4 +8,4 @@ class DomainError(Exception):
 
 
 class InvalidStateTransition(DomainError):
-    """Raised when an entity is moved into a state unreachable from its current one."""
+    """Raised when a state change is not allowed from the current state."""

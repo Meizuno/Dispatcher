@@ -26,7 +26,7 @@ include = ["dispatcher*"]
 
 [tool.ruff]
 target-version = "py312"
-line-length = 88
+line-length = 79  # PEP 8
 src = ["dispatcher", "tests"]
 
 [tool.ruff.lint]
