@@ -43,6 +43,9 @@ plugins = []
 module = "tests.*"
 disallow_untyped_defs = false
 disallow_incomplete_defs = false
+# Enum identity asserts (`x is Status.A`) narrow to a literal that mypy does
+# not widen after a mutating method call, producing false comparison-overlaps.
+strict_equality = false
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
