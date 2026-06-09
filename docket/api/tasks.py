@@ -9,12 +9,21 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-from docket.api.dependencies import AssignmentRepo, ServiceRepo, TaskRepo
+from docket.api.dependencies import (
+    AssignmentRepo,
+    BrokerDep,
+    CurrentService,
+    MaxAttempts,
+    ServiceRepo,
+    TaskRepo,
+)
 from docket.domain import TaskPriority, TaskStatus
 from docket.use_cases import (
+    ClaimTask,
     CompleteTask,
     FailTask,
     GetTask,
+    Heartbeat,
     ListPendingTasks,
     SubmitTask,
 )
@@ -42,12 +51,10 @@ class TaskOut(BaseModel):
 
 
 class TaskComplete(BaseModel):
-    service_id: uuid.UUID
     result: dict[str, Any] | None = None
 
 
 class TaskFail(BaseModel):
-    service_id: uuid.UUID
     error: str
 
 
@@ -55,10 +62,28 @@ router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
 @router.post("", status_code=201)
-async def submit_task(body: TaskCreate, tasks: TaskRepo) -> TaskOut:
-    task = await SubmitTask(tasks).execute(
+async def submit_task(body: TaskCreate, broker: BrokerDep) -> TaskOut:
+    task = await SubmitTask(broker).execute(
         body.name, body.payload, priority=body.priority
     )
+    return TaskOut.model_validate(task)
+
+
+@router.post("/claim")
+async def claim_task(
+    service: CurrentService,
+    broker: BrokerDep,
+    tasks: TaskRepo,
+    services: ServiceRepo,
+    assignments: AssignmentRepo,
+) -> TaskOut | None:
+    """Claim the next task; null when the queue is empty."""
+    claimed = await ClaimTask(broker, tasks, services, assignments).execute(
+        service.id
+    )
+    if claimed is None:
+        return None
+    task, _assignment = claimed
     return TaskOut.model_validate(task)
 
 
@@ -76,16 +101,27 @@ async def get_task(task_id: uuid.UUID, tasks: TaskRepo) -> TaskOut:
     return TaskOut.model_validate(task)
 
 
+@router.post("/{task_id}/heartbeat", status_code=204)
+async def heartbeat_task(
+    task_id: uuid.UUID,
+    service: CurrentService,
+    broker: BrokerDep,
+) -> None:
+    await Heartbeat(broker).execute(service.id, task_id)
+
+
 @router.post("/{task_id}/complete")
 async def complete_task(
     task_id: uuid.UUID,
     body: TaskComplete,
+    service: CurrentService,
+    broker: BrokerDep,
     tasks: TaskRepo,
     services: ServiceRepo,
     assignments: AssignmentRepo,
 ) -> TaskOut:
-    task = await CompleteTask(tasks, services, assignments).execute(
-        body.service_id, task_id, body.result
+    task = await CompleteTask(broker, tasks, services, assignments).execute(
+        service.id, task_id, body.result
     )
     return TaskOut.model_validate(task)
 
@@ -94,11 +130,14 @@ async def complete_task(
 async def fail_task(
     task_id: uuid.UUID,
     body: TaskFail,
+    service: CurrentService,
+    broker: BrokerDep,
     tasks: TaskRepo,
     services: ServiceRepo,
     assignments: AssignmentRepo,
+    max_attempts: MaxAttempts,
 ) -> TaskOut:
-    task = await FailTask(tasks, services, assignments).execute(
-        body.service_id, task_id, body.error
-    )
+    task = await FailTask(
+        broker, tasks, services, assignments, max_attempts=max_attempts
+    ).execute(service.id, task_id, body.error)
     return TaskOut.model_validate(task)

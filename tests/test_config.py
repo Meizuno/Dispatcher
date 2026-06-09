@@ -4,10 +4,29 @@ from pydantic import ValidationError
 
 
 def test_defaults() -> None:
-    settings = Settings()
+    # _env_file=None so a developer's local .env can't mask the code defaults.
+    settings = Settings(_env_file=None)
     assert settings.app_name == "docket"
     assert settings.database_url.startswith("postgresql+asyncpg://")
     assert settings.log_level == "INFO"
+    assert settings.max_attempts == 3
+    assert settings.lease_timeout == 30.0
+
+
+def test_invalid_max_attempts_fails_fast(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DOCKET_MAX_ATTEMPTS", "0")
+    with pytest.raises(ValidationError):
+        Settings()
+
+
+def test_invalid_lease_timeout_fails_fast(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    monkeypatch.setenv("DOCKET_LEASE_TIMEOUT", "0")
+    with pytest.raises(ValidationError):
+        Settings()
 
 
 def test_env_override(monkeypatch: pytest.MonkeyPatch) -> None:

@@ -48,6 +48,12 @@ class FakeServiceRepository:
     async def list_all(self) -> list[Service]:
         return list(self.items.values())
 
+    async def get_by_token_hash(self, token_hash: str) -> Service | None:
+        for service in self.items.values():
+            if service.token_hash == token_hash:
+                return service
+        return None
+
 
 class FakeAssignmentRepository:
     """In-memory AssignmentRepository."""
@@ -66,3 +72,11 @@ class FakeAssignmentRepository:
 
     async def list_active(self) -> list[Assignment]:
         return [a for a in self.items.values() if a.released_at is None]
+
+    async def get_active(self, task_id: uuid.UUID) -> Assignment | None:
+        for assignment in self.items.values():
+            if assignment.released_at is not None:
+                continue
+            if assignment.task_id == task_id:
+                return assignment
+        return None

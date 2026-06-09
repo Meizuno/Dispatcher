@@ -1,43 +1,61 @@
 import uuid
 
 import pytest
-from docket.domain import (
-    Assignment,
-    DomainError,
-    Service,
-    Task,
-    TaskStatus,
+from docket.domain import DomainError, Service, Task, TaskStatus
+from docket.infrastructure import (
+    SqlAssignmentRepository,
+    SqlBroker,
+    SqlServiceRepository,
+    SqlTaskRepository,
 )
-from docket.use_cases import CompleteTask, FailTask
-
-from tests.fakes import (
-    FakeAssignmentRepository,
-    FakeServiceRepository,
-    FakeTaskRepository,
-)
+from docket.use_cases import ClaimTask, CompleteTask, FailTask
+from sqlalchemy.ext.asyncio import AsyncConnection
 
 
-async def _running_task(
-    tasks: FakeTaskRepository,
-    services: FakeServiceRepository,
-    assignments: FakeAssignmentRepository,
-) -> tuple[Task, Service]:
-    service = Service(name="worker", busy=True)
-    await services.add(service)
-    task = Task(name="compute", status=TaskStatus.RUNNING)
-    await tasks.add(task)
-    await assignments.add(Assignment(task_id=task.id, service_id=service.id))
-    return task, service
+def _repos(
+    conn: AsyncConnection,
+) -> tuple[
+    SqlBroker,
+    SqlTaskRepository,
+    SqlServiceRepository,
+    SqlAssignmentRepository,
+]:
+    return (
+        SqlBroker(conn),
+        SqlTaskRepository(conn),
+        SqlServiceRepository(conn),
+        SqlAssignmentRepository(conn),
+    )
 
 
-async def test_complete_marks_succeeded_and_frees_service(
-    tasks: FakeTaskRepository,
-    services: FakeServiceRepository,
-    assignments: FakeAssignmentRepository,
+async def _register(conn: AsyncConnection, name: str = "worker") -> Service:
+    service = Service(name=name)
+    await SqlServiceRepository(conn).add(service)
+    return service
+
+
+async def _claimed(
+    conn: AsyncConnection, service: Service, *, attempts: int = 0
+) -> Task:
+    """Enqueue a task, optionally pre-aged by ``attempts``, and claim it."""
+    broker, tasks, services, assignments = _repos(conn)
+    task = Task(name="compute", attempts=attempts)
+    await broker.enqueue(task)
+    claimed = await ClaimTask(broker, tasks, services, assignments).execute(
+        service.id
+    )
+    assert claimed is not None
+    return claimed[0]
+
+
+async def test_complete_succeeds_and_releases_everything(
+    conn: AsyncConnection,
 ) -> None:
-    task, service = await _running_task(tasks, services, assignments)
+    broker, tasks, services, assignments = _repos(conn)
+    service = await _register(conn)
+    task = await _claimed(conn, service)
 
-    done = await CompleteTask(tasks, services, assignments).execute(
+    done = await CompleteTask(broker, tasks, services, assignments).execute(
         service.id, task.id, {"value": 42}
     )
 
@@ -46,47 +64,72 @@ async def test_complete_marks_succeeded_and_frees_service(
     freed = await services.get(service.id)
     assert freed is not None
     assert freed.busy is False
-    assert await assignments.list_active() == []
+    assert await assignments.get_active(task.id) is None
+    # lease released: a heartbeat by the (former) holder now fails
+    with pytest.raises(DomainError):
+        await broker.extend(service.id, task.id)
 
 
-async def test_fail_marks_failed_and_frees_service(
-    tasks: FakeTaskRepository,
-    services: FakeServiceRepository,
-    assignments: FakeAssignmentRepository,
+async def test_fail_under_budget_requeues_to_pending(
+    conn: AsyncConnection,
 ) -> None:
-    task, service = await _running_task(tasks, services, assignments)
+    broker, tasks, services, assignments = _repos(conn)
+    service = await _register(conn)
+    task = await _claimed(conn, service)  # attempts -> 1 at claim
 
-    failed = await FailTask(tasks, services, assignments).execute(
-        service.id, task.id, "boom"
-    )
+    failed = await FailTask(
+        broker, tasks, services, assignments, max_attempts=3
+    ).execute(service.id, task.id, "boom")
 
-    assert failed.status is TaskStatus.FAILED
+    assert failed.status is TaskStatus.PENDING
     assert failed.error == "boom"
     freed = await services.get(service.id)
     assert freed is not None
     assert freed.busy is False
-    assert await assignments.list_active() == []
+    assert await assignments.get_active(task.id) is None
+    # requeued: pullable again
+    repulled = await broker.pull(uuid.uuid4())
+    assert repulled is not None
+    assert repulled.id == task.id
 
 
-async def test_complete_unknown_task_raises(
-    tasks: FakeTaskRepository,
-    services: FakeServiceRepository,
-    assignments: FakeAssignmentRepository,
+async def test_fail_at_budget_dead_letters(conn: AsyncConnection) -> None:
+    broker, tasks, services, assignments = _repos(conn)
+    service = await _register(conn)
+    # pre-aged so this claim is the 3rd dispatch (attempts -> 3)
+    task = await _claimed(conn, service, attempts=2)
+
+    failed = await FailTask(
+        broker, tasks, services, assignments, max_attempts=3
+    ).execute(service.id, task.id, "boom")
+
+    assert failed.status is TaskStatus.FAILED
+    assert await broker.pull(uuid.uuid4()) is None  # not requeued
+
+
+async def test_complete_by_non_owner_is_rejected(
+    conn: AsyncConnection,
 ) -> None:
+    broker, tasks, services, assignments = _repos(conn)
+    owner = await _register(conn, "owner")
+    intruder = await _register(conn, "intruder")
+    task = await _claimed(conn, owner)
+
     with pytest.raises(DomainError):
-        await CompleteTask(tasks, services, assignments).execute(
-            uuid.uuid4(), uuid.uuid4()
+        await CompleteTask(broker, tasks, services, assignments).execute(
+            intruder.id, task.id
         )
 
 
-async def test_complete_non_running_task_raises(
-    tasks: FakeTaskRepository,
-    services: FakeServiceRepository,
-    assignments: FakeAssignmentRepository,
+async def test_complete_non_running_task_is_rejected(
+    conn: AsyncConnection,
 ) -> None:
-    task = Task(name="compute")  # PENDING
-    await tasks.add(task)
+    broker, tasks, services, assignments = _repos(conn)
+    service = await _register(conn)
+    task = Task(name="compute")
+    await broker.enqueue(task)  # PENDING, never claimed -> no ownership
+
     with pytest.raises(DomainError):
-        await CompleteTask(tasks, services, assignments).execute(
-            uuid.uuid4(), task.id
+        await CompleteTask(broker, tasks, services, assignments).execute(
+            service.id, task.id
         )

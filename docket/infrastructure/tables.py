@@ -41,6 +41,7 @@ services = Table(
     Column("name", String, nullable=False),
     Column("status", String, nullable=False),
     Column("busy", Boolean, nullable=False),
+    Column("token_hash", String, nullable=False),
     Column("registered_at", DateTime(timezone=True), nullable=False),
     Column("last_seen_at", DateTime(timezone=True), nullable=False),
 )

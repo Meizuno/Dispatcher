@@ -59,6 +59,8 @@ async def test_claim_leases_task_and_marks_service_busy(
     busy = await services.get(service.id)
     assert busy is not None
     assert busy.busy is True
+    # the lease is held by the claiming service (heartbeat succeeds)
+    await SqlBroker(conn).extend(service.id, task.id)
 
 
 async def test_claim_unknown_service_raises(conn: AsyncConnection) -> None:

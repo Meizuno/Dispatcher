@@ -1,6 +1,11 @@
 import uuid
+from collections.abc import Awaitable, Callable
 
 import httpx
+
+from tests.api.conftest import Registered
+
+Register = Callable[[str], Awaitable[Registered]]
 
 
 async def test_submit_then_get_task(client: httpx.AsyncClient) -> None:
@@ -36,16 +41,56 @@ async def test_list_pending_tasks(client: httpx.AsyncClient) -> None:
     assert [t["name"] for t in response.json()] == ["a"]
 
 
-async def test_claim_then_complete_lifecycle(
+async def test_claim_requires_authentication(
     client: httpx.AsyncClient,
 ) -> None:
-    service = (await client.post("/services", json={"name": "w"})).json()
+    assert (await client.post("/tasks/claim")).status_code == 401
+
+
+async def test_unknown_token_is_rejected(client: httpx.AsyncClient) -> None:
+    response = await client.post(
+        "/tasks/claim", headers={"Authorization": "Bearer nope"}
+    )
+    assert response.status_code == 401
+
+
+async def test_claim_marks_service_busy(
+    client: httpx.AsyncClient, register: Register
+) -> None:
+    service, headers = await register("w")
     task = (await client.post("/tasks", json={"name": "compute"})).json()
-    await client.post(f"/services/{service['id']}/claim")
+
+    claimed = await client.post("/tasks/claim", headers=headers)
+    assert claimed.status_code == 200
+    assert claimed.json()["id"] == task["id"]
+
+    busy = (await client.get(f"/services/{service['id']}")).json()
+    assert busy["busy"] is True
+
+
+async def test_claim_empty_queue_returns_null(
+    client: httpx.AsyncClient, register: Register
+) -> None:
+    _service, headers = await register("w")
+    claimed = await client.post("/tasks/claim", headers=headers)
+    assert claimed.status_code == 200
+    assert claimed.json() is None
+
+
+async def test_claim_heartbeat_complete_lifecycle(
+    client: httpx.AsyncClient, register: Register
+) -> None:
+    service, headers = await register("w")
+    task = (await client.post("/tasks", json={"name": "compute"})).json()
+    await client.post("/tasks/claim", headers=headers)
+
+    beat = await client.post(f"/tasks/{task['id']}/heartbeat", headers=headers)
+    assert beat.status_code == 204
 
     completed = await client.post(
         f"/tasks/{task['id']}/complete",
-        json={"service_id": service["id"], "result": {"value": 42}},
+        json={"result": {"value": 42}},
+        headers=headers,
     )
     assert completed.status_code == 200
     body = completed.json()
@@ -56,32 +101,69 @@ async def test_claim_then_complete_lifecycle(
     assert freed["busy"] is False
 
 
-async def test_claim_then_fail_lifecycle(client: httpx.AsyncClient) -> None:
-    service = (await client.post("/services", json={"name": "w"})).json()
+async def test_fail_requeues_under_budget(
+    client: httpx.AsyncClient, register: Register
+) -> None:
+    _service, headers = await register("w")
     task = (await client.post("/tasks", json={"name": "compute"})).json()
-    await client.post(f"/services/{service['id']}/claim")
+    await client.post("/tasks/claim", headers=headers)
 
     failed = await client.post(
         f"/tasks/{task['id']}/fail",
-        json={"service_id": service["id"], "error": "boom"},
+        json={"error": "boom"},
+        headers=headers,
     )
     assert failed.status_code == 200
-    body = failed.json()
-    assert body["status"] == "failed"
-    assert body["error"] == "boom"
+    assert failed.json()["status"] == "pending"  # attempt 1 of 3
 
-    freed = (await client.get(f"/services/{service['id']}")).json()
-    assert freed["busy"] is False
+    reclaim = (await client.post("/tasks/claim", headers=headers)).json()
+    assert reclaim["id"] == task["id"]
 
 
-async def test_complete_non_running_task_returns_400(
-    client: httpx.AsyncClient,
+async def test_fail_exhausts_retries_to_dead_letter(
+    client: httpx.AsyncClient, register: Register
 ) -> None:
-    service = (await client.post("/services", json={"name": "w"})).json()
+    _service, headers = await register("w")
     task = (await client.post("/tasks", json={"name": "compute"})).json()
-    # Not claimed -> still PENDING, cannot be completed.
-    response = await client.post(
+
+    statuses = []
+    for _ in range(3):  # default budget is 3 dispatches
+        await client.post("/tasks/claim", headers=headers)
+        failed = await client.post(
+            f"/tasks/{task['id']}/fail",
+            json={"error": "boom"},
+            headers=headers,
+        )
+        statuses.append(failed.json()["status"])
+
+    assert statuses == ["pending", "pending", "failed"]
+    # dead-lettered: no longer pullable
+    assert (await client.post("/tasks/claim", headers=headers)).json() is None
+
+
+async def test_cannot_complete_another_services_task(
+    client: httpx.AsyncClient, register: Register
+) -> None:
+    _owner, owner_headers = await register("owner")
+    _intruder, intruder_headers = await register("intruder")
+    task = (await client.post("/tasks", json={"name": "compute"})).json()
+    await client.post("/tasks/claim", headers=owner_headers)  # owner claims
+
+    stolen = await client.post(
         f"/tasks/{task['id']}/complete",
-        json={"service_id": service["id"]},
+        json={},
+        headers=intruder_headers,
+    )
+    assert stolen.status_code == 400
+
+
+async def test_complete_unclaimed_task_returns_400(
+    client: httpx.AsyncClient, register: Register
+) -> None:
+    _service, headers = await register("w")
+    task = (await client.post("/tasks", json={"name": "compute"})).json()
+    # never claimed -> caller does not own it
+    response = await client.post(
+        f"/tasks/{task['id']}/complete", json={}, headers=headers
     )
     assert response.status_code == 400

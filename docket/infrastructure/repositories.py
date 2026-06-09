@@ -68,6 +68,7 @@ def dump_service(service: Service) -> dict[str, Any]:
         "name": service.name,
         "status": service.status.value,
         "busy": service.busy,
+        "token_hash": service.token_hash,
         "registered_at": service.registered_at,
         "last_seen_at": service.last_seen_at,
     }
@@ -79,6 +80,7 @@ def load_service(row: RowMapping) -> Service:
         name=row["name"],
         status=ServiceStatus(row["status"]),
         busy=row["busy"],
+        token_hash=row["token_hash"],
         registered_at=_aware(row["registered_at"]),
         last_seen_at=_aware(row["last_seen_at"]),
     )
@@ -163,6 +165,13 @@ class SqlServiceRepository:
         result = await self._conn.execute(select(services))
         return [load_service(row) for row in result.mappings().all()]
 
+    async def get_by_token_hash(self, token_hash: str) -> Service | None:
+        result = await self._conn.execute(
+            select(services).where(services.c.token_hash == token_hash)
+        )
+        row = result.mappings().first()
+        return None if row is None else load_service(row)
+
 
 class SqlAssignmentRepository:
     def __init__(self, conn: AsyncConnection) -> None:
@@ -192,3 +201,13 @@ class SqlAssignmentRepository:
             select(assignments).where(assignments.c.released_at.is_(None))
         )
         return [load_assignment(row) for row in result.mappings().all()]
+
+    async def get_active(self, task_id: uuid.UUID) -> Assignment | None:
+        result = await self._conn.execute(
+            select(assignments).where(
+                assignments.c.task_id == task_id,
+                assignments.c.released_at.is_(None),
+            )
+        )
+        row = result.mappings().first()
+        return None if row is None else load_assignment(row)
