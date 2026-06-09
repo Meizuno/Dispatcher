@@ -10,7 +10,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
 from dispatcher.api.dependencies import TaskRepo
-from dispatcher.models import TaskPriority, TaskStatus
+from dispatcher.domain import TaskPriority, TaskStatus
 from dispatcher.use_cases import GetTask, ListPendingTasks, SubmitTask
 
 

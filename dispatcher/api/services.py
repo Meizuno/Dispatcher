@@ -9,7 +9,7 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
 
 from dispatcher.api.dependencies import ServiceRepo
-from dispatcher.models import ServiceStatus
+from dispatcher.domain import ServiceStatus
 from dispatcher.use_cases import GetService, ListServices, RegisterService
 
 

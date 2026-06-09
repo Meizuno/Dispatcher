@@ -1,5 +1,5 @@
 from dispatcher.core import Dispatcher
-from dispatcher.models import (
+from dispatcher.domain import (
     Service,
     ServiceStatus,
     Task,

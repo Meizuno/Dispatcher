@@ -1,6 +1,5 @@
-from dispatcher.broker import InMemoryBroker
-from dispatcher.models import Task, TaskPriority
-from dispatcher.ports import Broker
+from dispatcher.domain import Broker, Task, TaskPriority
+from dispatcher.infrastructure import InMemoryBroker
 
 
 def test_conforms_to_protocol() -> None:

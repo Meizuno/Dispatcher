@@ -3,19 +3,17 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 
 import pytest
-from dispatcher.models import (
+from dispatcher.domain import (
     Assignment,
+    AssignmentRepository,
     Service,
+    ServiceRepository,
     Task,
     TaskPriority,
+    TaskRepository,
     TaskStatus,
 )
-from dispatcher.ports import (
-    AssignmentRepository,
-    ServiceRepository,
-    TaskRepository,
-)
-from dispatcher.sqlite import (
+from dispatcher.infrastructure import (
     SqliteAssignmentRepository,
     SqliteServiceRepository,
     SqliteTaskRepository,

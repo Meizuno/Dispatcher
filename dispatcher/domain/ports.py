@@ -8,7 +8,7 @@ from __future__ import annotations
 import uuid
 from typing import Protocol
 
-from dispatcher.models import Assignment, Service, Task
+from dispatcher.domain.models import Assignment, Service, Task
 
 
 class TaskRepository(Protocol):

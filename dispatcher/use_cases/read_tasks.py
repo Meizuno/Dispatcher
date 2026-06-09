@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from dispatcher.models import Task
-from dispatcher.ports import TaskRepository
+from dispatcher.domain import Task, TaskRepository
 
 
 class GetTask:

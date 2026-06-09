@@ -4,8 +4,7 @@ from __future__ import annotations
 
 import uuid
 
-from dispatcher.models import Service
-from dispatcher.ports import ServiceRepository
+from dispatcher.domain import Service, ServiceRepository
 
 
 class GetService:

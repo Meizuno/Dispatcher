@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from dispatcher.errors import DomainError
-from dispatcher.models import Service
-from dispatcher.ports import ServiceRepository
+from dispatcher.domain import DomainError, Service, ServiceRepository
 
 
 class RegisterService:
