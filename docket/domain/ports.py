@@ -41,6 +41,13 @@ class Broker(Protocol):
     never changes task status — use cases do, via the TaskRepository. A task
     is pullable while it is PENDING and not currently leased.
 
+    Invariant: the Broker and the TaskRepository are two views over ONE task
+    store, so an enqueued task is immediately visible to repository reads
+    (e.g. list_pending) and a status change is visible to the broker. SQL
+    realizes this with the shared tasks table; in-memory test doubles share a
+    backing dict. A broker not backed by the same store as its repository
+    breaks ``SubmitTask`` -> ``list_pending``.
+
     A consumer identifies itself on ``pull``, which leases the task to it. The
     lease is the sole authority over a RUNNING task: a worker holds the task
     only while it holds a live lease, so it MUST renew with ``extend``

@@ -30,9 +30,11 @@ class _Lease:
 class InMemoryBroker:
     """In-memory pull broker with the same lease semantics as SqlBroker.
 
-    Stores enqueued tasks by id; a task is pullable while it is PENDING and
-    not currently leased. The broker owns only the lease, never task status —
-    it holds the actual Task objects, so a status change a use case makes is
+    A task is pullable while it is PENDING and not currently leased. The
+    broker owns only the lease, never task status. To mirror how SqlBroker and
+    SqlTaskRepository are two views over the tasks table, pass the same
+    ``store`` dict to this broker and the in-memory TaskRepository so they
+    share one task store; a status change made through the repo is then
     visible here. Methods are async to satisfy the port but need no lock on a
     single event loop. The clock is injectable for tests.
     """
@@ -42,8 +44,9 @@ class InMemoryBroker:
         lease_timeout: float = DEFAULT_LEASE_TIMEOUT,
         *,
         clock: Callable[[], datetime] = _utcnow,
+        store: dict[uuid.UUID, Task] | None = None,
     ) -> None:
-        self._tasks: dict[uuid.UUID, Task] = {}
+        self._tasks: dict[uuid.UUID, Task] = {} if store is None else store
         self._leases: dict[uuid.UUID, _Lease] = {}
         self._lease_timeout = lease_timeout
         self._clock = clock
