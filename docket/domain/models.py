@@ -60,6 +60,8 @@ class Service:
     name: str
     status: ServiceStatus = ServiceStatus.ONLINE
     busy: bool = False
+    # SHA-256 of the service's bearer token; the plaintext is never stored.
+    token_hash: str = ""
     registered_at: datetime = field(default_factory=lambda: datetime.now(UTC))
     last_seen_at: datetime = field(default_factory=lambda: datetime.now(UTC))
 

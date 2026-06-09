@@ -8,20 +8,9 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
 
-from docket.api.dependencies import (
-    AssignmentRepo,
-    BrokerDep,
-    ServiceRepo,
-    TaskRepo,
-)
-from docket.api.tasks import TaskOut
+from docket.api.dependencies import ServiceRepo
 from docket.domain import ServiceStatus
-from docket.use_cases import (
-    ClaimTask,
-    GetService,
-    ListServices,
-    RegisterService,
-)
+from docket.use_cases import GetService, ListServices, RegisterService
 
 
 class ServiceCreate(BaseModel):
@@ -39,15 +28,21 @@ class ServiceOut(BaseModel):
     last_seen_at: datetime
 
 
+class ServiceRegistered(ServiceOut):
+    # The bearer token is returned exactly once, at registration.
+    token: str
+
+
 router = APIRouter(prefix="/services", tags=["services"])
 
 
 @router.post("", status_code=201)
 async def register_service(
     body: ServiceCreate, services: ServiceRepo
-) -> ServiceOut:
-    service = await RegisterService(services).execute(body.name)
-    return ServiceOut.model_validate(service)
+) -> ServiceRegistered:
+    service, token = await RegisterService(services).execute(body.name)
+    out = ServiceOut.model_validate(service)
+    return ServiceRegistered(**out.model_dump(), token=token)
 
 
 @router.get("")
@@ -66,21 +61,3 @@ async def get_service(
     if service is None:
         raise HTTPException(status_code=404, detail="service not found")
     return ServiceOut.model_validate(service)
-
-
-@router.post("/{service_id}/claim")
-async def claim_task(
-    service_id: uuid.UUID,
-    broker: BrokerDep,
-    tasks: TaskRepo,
-    services: ServiceRepo,
-    assignments: AssignmentRepo,
-) -> TaskOut | None:
-    """Claim the next task; null when the queue is empty."""
-    claimed = await ClaimTask(broker, tasks, services, assignments).execute(
-        service_id
-    )
-    if claimed is None:
-        return None
-    task, _assignment = claimed
-    return TaskOut.model_validate(task)

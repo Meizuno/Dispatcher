@@ -12,11 +12,13 @@ from pydantic import BaseModel, ConfigDict, Field
 from docket.api.dependencies import (
     AssignmentRepo,
     BrokerDep,
+    CurrentService,
     ServiceRepo,
     TaskRepo,
 )
 from docket.domain import TaskPriority, TaskStatus
 from docket.use_cases import (
+    ClaimTask,
     CompleteTask,
     FailTask,
     GetTask,
@@ -48,17 +50,11 @@ class TaskOut(BaseModel):
 
 
 class TaskComplete(BaseModel):
-    service_id: uuid.UUID
     result: dict[str, Any] | None = None
 
 
 class TaskFail(BaseModel):
-    service_id: uuid.UUID
     error: str
-
-
-class TaskHeartbeat(BaseModel):
-    service_id: uuid.UUID
 
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
@@ -69,6 +65,24 @@ async def submit_task(body: TaskCreate, broker: BrokerDep) -> TaskOut:
     task = await SubmitTask(broker).execute(
         body.name, body.payload, priority=body.priority
     )
+    return TaskOut.model_validate(task)
+
+
+@router.post("/claim")
+async def claim_task(
+    service: CurrentService,
+    broker: BrokerDep,
+    tasks: TaskRepo,
+    services: ServiceRepo,
+    assignments: AssignmentRepo,
+) -> TaskOut | None:
+    """Claim the next task; null when the queue is empty."""
+    claimed = await ClaimTask(broker, tasks, services, assignments).execute(
+        service.id
+    )
+    if claimed is None:
+        return None
+    task, _assignment = claimed
     return TaskOut.model_validate(task)
 
 
@@ -89,23 +103,24 @@ async def get_task(task_id: uuid.UUID, tasks: TaskRepo) -> TaskOut:
 @router.post("/{task_id}/heartbeat", status_code=204)
 async def heartbeat_task(
     task_id: uuid.UUID,
-    body: TaskHeartbeat,
+    service: CurrentService,
     broker: BrokerDep,
 ) -> None:
-    await Heartbeat(broker).execute(body.service_id, task_id)
+    await Heartbeat(broker).execute(service.id, task_id)
 
 
 @router.post("/{task_id}/complete")
 async def complete_task(
     task_id: uuid.UUID,
     body: TaskComplete,
+    service: CurrentService,
     broker: BrokerDep,
     tasks: TaskRepo,
     services: ServiceRepo,
     assignments: AssignmentRepo,
 ) -> TaskOut:
     task = await CompleteTask(broker, tasks, services, assignments).execute(
-        body.service_id, task_id, body.result
+        service.id, task_id, body.result
     )
     return TaskOut.model_validate(task)
 
@@ -114,12 +129,13 @@ async def complete_task(
 async def fail_task(
     task_id: uuid.UUID,
     body: TaskFail,
+    service: CurrentService,
     broker: BrokerDep,
     tasks: TaskRepo,
     services: ServiceRepo,
     assignments: AssignmentRepo,
 ) -> TaskOut:
     task = await FailTask(broker, tasks, services, assignments).execute(
-        body.service_id, task_id, body.error
+        service.id, task_id, body.error
     )
     return TaskOut.model_validate(task)

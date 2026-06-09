@@ -6,7 +6,7 @@ from collections.abc import AsyncIterator
 from functools import lru_cache
 from typing import Annotated
 
-from fastapi import Depends
+from fastapi import Depends, Header, HTTPException
 from sqlalchemy.ext.asyncio import (
     AsyncConnection,
     AsyncEngine,
@@ -14,12 +14,14 @@ from sqlalchemy.ext.asyncio import (
 )
 
 from docket.config import get_settings
+from docket.domain import Service
 from docket.infrastructure import (
     SqlAssignmentRepository,
     SqlBroker,
     SqlServiceRepository,
     SqlTaskRepository,
 )
+from docket.security import hash_token
 
 
 @lru_cache
@@ -59,3 +61,21 @@ AssignmentRepo = Annotated[
     SqlAssignmentRepository, Depends(get_assignment_repo)
 ]
 BrokerDep = Annotated[SqlBroker, Depends(get_broker)]
+
+
+async def current_service(
+    services: ServiceRepo,
+    authorization: Annotated[str | None, Header()] = None,
+) -> Service:
+    """Resolve the authenticated service from a ``Bearer <token>`` header."""
+    prefix = "Bearer "
+    if authorization is None or not authorization.startswith(prefix):
+        raise HTTPException(status_code=401, detail="missing bearer token")
+    token = authorization[len(prefix) :].strip()
+    service = await services.get_by_token_hash(hash_token(token))
+    if service is None:
+        raise HTTPException(status_code=401, detail="unknown service token")
+    return service
+
+
+CurrentService = Annotated[Service, Depends(current_service)]

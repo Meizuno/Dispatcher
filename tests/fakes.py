@@ -48,6 +48,12 @@ class FakeServiceRepository:
     async def list_all(self) -> list[Service]:
         return list(self.items.values())
 
+    async def get_by_token_hash(self, token_hash: str) -> Service | None:
+        for service in self.items.values():
+            if service.token_hash == token_hash:
+                return service
+        return None
+
 
 class FakeAssignmentRepository:
     """In-memory AssignmentRepository."""

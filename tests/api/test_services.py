@@ -1,18 +1,31 @@
 import uuid
+from collections.abc import Awaitable, Callable
 
 import httpx
 
+from tests.api.conftest import Registered
 
-async def test_register_then_get_service(client: httpx.AsyncClient) -> None:
+
+async def test_register_returns_a_token_once(
+    client: httpx.AsyncClient,
+) -> None:
     created = await client.post("/services", json={"name": "worker-1"})
     assert created.status_code == 201
     body = created.json()
     assert body["status"] == "online"
     assert body["busy"] is False
+    assert body["token"]  # plaintext token, shown only here
 
-    fetched = await client.get(f"/services/{body['id']}")
-    assert fetched.status_code == 200
-    assert fetched.json()["name"] == "worker-1"
+
+async def test_token_hash_is_never_exposed(
+    client: httpx.AsyncClient,
+) -> None:
+    created = (await client.post("/services", json={"name": "w"})).json()
+    fetched = (await client.get(f"/services/{created['id']}")).json()
+    assert "token" not in fetched
+    assert "token_hash" not in fetched
+    listed = (await client.get("/services")).json()
+    assert all("token" not in s and "token_hash" not in s for s in listed)
 
 
 async def test_get_missing_service_returns_404(
@@ -29,34 +42,12 @@ async def test_register_empty_name_returns_400(
     assert response.status_code == 400
 
 
-async def test_list_services(client: httpx.AsyncClient) -> None:
-    await client.post("/services", json={"name": "a"})
-    await client.post("/services", json={"name": "b"})
+async def test_list_services(
+    register: Callable[[str], Awaitable[Registered]],
+    client: httpx.AsyncClient,
+) -> None:
+    await register("a")
+    await register("b")
     response = await client.get("/services")
     assert response.status_code == 200
     assert {s["name"] for s in response.json()} == {"a", "b"}
-
-
-async def test_claim_returns_task_and_marks_service_busy(
-    client: httpx.AsyncClient,
-) -> None:
-    service = (await client.post("/services", json={"name": "w"})).json()
-    task = (await client.post("/tasks", json={"name": "compute"})).json()
-
-    claimed = await client.post(f"/services/{service['id']}/claim")
-    assert claimed.status_code == 200
-    body = claimed.json()
-    assert body["id"] == task["id"]
-    assert body["status"] == "running"
-
-    fetched = (await client.get(f"/services/{service['id']}")).json()
-    assert fetched["busy"] is True
-
-
-async def test_claim_empty_queue_returns_null(
-    client: httpx.AsyncClient,
-) -> None:
-    service = (await client.post("/services", json={"name": "w"})).json()
-    claimed = await client.post(f"/services/{service['id']}/claim")
-    assert claimed.status_code == 200
-    assert claimed.json() is None
