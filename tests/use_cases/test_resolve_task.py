@@ -82,6 +82,19 @@ async def test_complete_succeeds_and_releases_everything(
         await broker.extend(service.id, task.id)
 
 
+async def test_complete_clears_prior_error(conn: AsyncConnection) -> None:
+    broker, tasks, services, assignments = _repos(conn)
+    service = await _register(conn)
+    task = await _claimed(conn, service)  # RUNNING, leased
+    task.error = "failed: earlier attempt"  # a recorded prior-attempt reason
+    await tasks.update(task)
+
+    done = await CompleteTask(broker, tasks, services, assignments).execute(
+        service.id, task.id
+    )
+    assert done.error is None
+
+
 async def test_fail_under_budget_requeues_to_pending(
     conn: AsyncConnection,
 ) -> None:

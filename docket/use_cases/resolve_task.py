@@ -58,11 +58,11 @@ async def _free_service(
 class CompleteTask:
     """Mark a running task SUCCEEDED, release its lease and its service.
 
-    The lease is the sole authority: releasing it (``ack``) is a conditional
-    write that succeeds only for the current live holder and raises
-    otherwise, so a worker that lost its lease writes nothing — no terminal
-    status that later rolls back. The Assignment is an audit record, not a
-    second gate.
+    The lease is the sole authority: ``release`` is a conditional write that
+    succeeds only for the current live holder and raises otherwise, so a
+    worker that lost its lease writes nothing — no terminal status that later
+    rolls back. The Assignment is an audit record, not a second gate. Any
+    error left by a prior failed attempt is cleared on success.
     """
 
     def __init__(
@@ -87,6 +87,7 @@ class CompleteTask:
         task = await _running_task(self._tasks, task_id)
         task.status = TaskStatus.SUCCEEDED
         task.result = result
+        task.error = None  # clear any prior failed-attempt reason
         task.updated_at = datetime.now(UTC)
         await self._tasks.update(task)
         await _release_assignment(self._assignments, task_id)
@@ -100,7 +101,9 @@ class FailTask:
     Authorized by the lease (releasing it raises for anyone but the live
     holder). Under ``max_attempts`` the task returns to PENDING (pullable
     again); at the limit it becomes FAILED. The Assignment is released and
-    the service freed.
+    the service freed. A requeued task keeps ``error`` as its last-failure
+    reason (it is cleared only on success), so the next attempt can see why
+    the previous one failed.
     """
 
     def __init__(
