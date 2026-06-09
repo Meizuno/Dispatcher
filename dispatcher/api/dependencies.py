@@ -9,7 +9,7 @@ from typing import Annotated
 from fastapi import Depends
 
 from dispatcher.config import Settings, get_settings
-from dispatcher.sqlite import (
+from dispatcher.infrastructure import (
     SqliteServiceRepository,
     SqliteTaskRepository,
     connect,

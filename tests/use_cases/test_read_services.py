@@ -1,6 +1,6 @@
 import uuid
 
-from dispatcher.models import Service
+from dispatcher.domain import Service
 from dispatcher.use_cases import GetService, ListServices
 
 from tests.fakes import FakeServiceRepository

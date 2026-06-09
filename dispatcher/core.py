@@ -4,11 +4,14 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from dispatcher.models import Assignment, Service, ServiceStatus, TaskStatus
-from dispatcher.ports import (
+from dispatcher.domain import (
+    Assignment,
     AssignmentRepository,
+    Service,
     ServiceRepository,
+    ServiceStatus,
     TaskRepository,
+    TaskStatus,
 )
 
 

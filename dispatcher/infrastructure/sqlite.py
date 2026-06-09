@@ -12,7 +12,7 @@ import uuid
 from datetime import datetime
 from typing import Any
 
-from dispatcher.models import (
+from dispatcher.domain import (
     Assignment,
     Service,
     ServiceStatus,

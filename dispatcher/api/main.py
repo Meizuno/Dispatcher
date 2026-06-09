@@ -6,7 +6,7 @@ from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
 from dispatcher.api import services, tasks
-from dispatcher.errors import DomainError
+from dispatcher.domain import DomainError
 
 app = FastAPI(title="Dispatcher")
 

@@ -1,6 +1,6 @@
 import uuid
 
-from dispatcher.models import Task, TaskStatus
+from dispatcher.domain import Task, TaskStatus
 from dispatcher.use_cases import GetTask, ListPendingTasks, SubmitTask
 
 from tests.fakes import FakeTaskRepository

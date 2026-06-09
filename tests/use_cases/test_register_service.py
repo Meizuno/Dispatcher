@@ -1,6 +1,5 @@
 import pytest
-from dispatcher.errors import DomainError
-from dispatcher.models import ServiceStatus
+from dispatcher.domain import DomainError, ServiceStatus
 from dispatcher.use_cases import RegisterService
 
 from tests.fakes import FakeServiceRepository

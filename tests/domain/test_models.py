@@ -1,6 +1,6 @@
 import uuid
 
-from dispatcher.models import (
+from dispatcher.domain import (
     Assignment,
     Service,
     ServiceStatus,
