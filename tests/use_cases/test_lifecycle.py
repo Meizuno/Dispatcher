@@ -104,14 +104,16 @@ async def test_submit_claim_heartbeat_complete(pairing: Pairing) -> None:
 
     claimed = await ClaimTask(
         pairing.broker, pairing.tasks, pairing.services, pairing.assignments
-    ).execute(service.id)
+    ).execute(service)
     assert claimed is not None
     assert claimed[0].id == task.id
     # now RUNNING, so no longer pending
     assert await ListPendingTasks(pairing.tasks).execute() == []
 
     pairing.clock.advance(LEASE - 1)
-    await Heartbeat(pairing.broker).execute(service.id, task.id)
+    await Heartbeat(pairing.broker, pairing.services).execute(
+        service.id, task.id
+    )
     pairing.clock.advance(LEASE - 1)  # past original deadline, lease renewed
 
     done = await CompleteTask(
@@ -133,7 +135,7 @@ async def test_submit_claim_fail_requeue_reclaim(pairing: Pairing) -> None:
 
     await ClaimTask(
         pairing.broker, pairing.tasks, pairing.services, pairing.assignments
-    ).execute(service.id)  # attempts -> 1
+    ).execute(service)  # attempts -> 1
     failed = await FailTask(
         pairing.broker,
         pairing.tasks,
@@ -146,9 +148,12 @@ async def test_submit_claim_fail_requeue_reclaim(pairing: Pairing) -> None:
         task.id
     ]
 
+    # re-load the (now freed) service, as current_service would per request
+    fresh = await pairing.services.get(service.id)
+    assert fresh is not None
     claimed = await ClaimTask(
         pairing.broker, pairing.tasks, pairing.services, pairing.assignments
-    ).execute(service.id)  # attempts -> 2
+    ).execute(fresh)  # attempts -> 2
     assert claimed is not None
 
     pairing.clock.advance(LEASE + 1)  # worker stalls; lease lapses

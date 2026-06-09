@@ -47,6 +47,7 @@ async def _free_service(
     service = await services.get(service_id)
     if service is not None:
         service.busy = False
+        service.last_seen_at = datetime.now(UTC)
         await services.update(service)
 
 

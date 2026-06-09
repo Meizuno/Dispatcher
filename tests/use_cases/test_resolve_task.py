@@ -54,7 +54,7 @@ async def _claimed(
     task = Task(name="compute", attempts=attempts)
     await broker.enqueue(task)
     claimed = await ClaimTask(broker, tasks, services, assignments).execute(
-        service.id
+        service
     )
     assert claimed is not None
     return claimed[0]
@@ -162,7 +162,7 @@ async def test_complete_after_lease_lost_is_rejected_without_rollback(
     task = Task(name="compute")
     await broker.enqueue(task)
     claimed = await ClaimTask(broker, tasks, services, assignments).execute(
-        service.id
+        service
     )
     assert claimed is not None
 
