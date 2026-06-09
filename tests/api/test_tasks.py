@@ -43,6 +43,13 @@ async def test_claim_then_complete_lifecycle(
     task = (await client.post("/tasks", json={"name": "compute"})).json()
     await client.post(f"/services/{service['id']}/claim")
 
+    # a running worker renews its lease
+    beat = await client.post(
+        f"/tasks/{task['id']}/heartbeat",
+        json={"service_id": service["id"]},
+    )
+    assert beat.status_code == 204
+
     completed = await client.post(
         f"/tasks/{task['id']}/complete",
         json={"service_id": service["id"], "result": {"value": 42}},
@@ -56,7 +63,9 @@ async def test_claim_then_complete_lifecycle(
     assert freed["busy"] is False
 
 
-async def test_claim_then_fail_lifecycle(client: httpx.AsyncClient) -> None:
+async def test_claim_then_fail_requeues_under_budget(
+    client: httpx.AsyncClient,
+) -> None:
     service = (await client.post("/services", json={"name": "w"})).json()
     task = (await client.post("/tasks", json={"name": "compute"})).json()
     await client.post(f"/services/{service['id']}/claim")
@@ -67,11 +76,15 @@ async def test_claim_then_fail_lifecycle(client: httpx.AsyncClient) -> None:
     )
     assert failed.status_code == 200
     body = failed.json()
-    assert body["status"] == "failed"
+    # first failure (attempt 1 of 3) returns the task to the queue
+    assert body["status"] == "pending"
     assert body["error"] == "boom"
 
     freed = (await client.get(f"/services/{service['id']}")).json()
     assert freed["busy"] is False
+    # and it is pullable again
+    reclaim = (await client.post(f"/services/{service['id']}/claim")).json()
+    assert reclaim["id"] == task["id"]
 
 
 async def test_complete_non_running_task_returns_400(

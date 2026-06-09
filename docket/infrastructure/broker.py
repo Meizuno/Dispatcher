@@ -5,7 +5,6 @@ from __future__ import annotations
 import uuid
 from collections.abc import Callable
 from datetime import UTC, datetime, timedelta
-from typing import Any
 
 from sqlalchemy import insert, select, update
 from sqlalchemy.ext.asyncio import AsyncConnection
@@ -24,13 +23,14 @@ def _utcnow() -> datetime:
 class SqlBroker:
     """A pull-based broker over the tasks table (Postgres in production).
 
-    The queue is the set of PENDING tasks. ``pull`` claims the highest-
-    priority one with ``SELECT ... FOR UPDATE SKIP LOCKED`` (concurrency-safe
-    on Postgres; a no-op clause on sqlite) and leases it via the locked_by /
-    lease_expires_at columns. ``ack`` removes it from the queue (status ->
-    RUNNING), ``nack`` clears the lease (pullable again), and an expired
-    lease is reclaimed on the next pull. ``requeue_service`` clears all of a
-    crashed consumer's leases at once.
+    The queue is the set of PENDING tasks not currently leased. ``pull``
+    claims the highest-priority one with ``SELECT ... FOR UPDATE SKIP LOCKED``
+    (concurrency-safe on Postgres; a no-op clause on sqlite) and leases it via
+    the locked_by / lease_expires_at columns. The lease is held through
+    execution and renewed with ``extend``; ``ack`` and ``nack`` release it
+    (the use case has already set the terminal/requeued status). The broker
+    never writes task status. ``requeue_service`` releases all of a crashed
+    consumer's leases, and ``reclaim_expired`` releases every lapsed lease.
     """
 
     def __init__(
@@ -78,13 +78,28 @@ class SqlBroker:
         )
         return load_task(row)
 
-    async def ack(self, service_id: uuid.UUID, task_id: uuid.UUID) -> None:
-        await self._resolve(
-            service_id, task_id, status=TaskStatus.RUNNING.value
+    async def extend(self, service_id: uuid.UUID, task_id: uuid.UUID) -> None:
+        now = self._clock()
+        expires = now + timedelta(seconds=self._lease_timeout)
+        result = await self._conn.execute(
+            update(tasks)
+            .where(
+                tasks.c.id == task_id,
+                tasks.c.locked_by == service_id,
+                tasks.c.lease_expires_at > now,
+            )
+            .values(lease_expires_at=expires)
         )
+        if result.rowcount == 0:
+            raise DomainError(
+                f"task {task_id} is not leased to service {service_id}"
+            )
+
+    async def ack(self, service_id: uuid.UUID, task_id: uuid.UUID) -> None:
+        await self._release(service_id, task_id)
 
     async def nack(self, service_id: uuid.UUID, task_id: uuid.UUID) -> None:
-        await self._resolve(service_id, task_id, status=None)
+        await self._release(service_id, task_id)
 
     async def requeue_service(self, service_id: uuid.UUID) -> None:
         await self._conn.execute(
@@ -93,12 +108,26 @@ class SqlBroker:
             .values(locked_by=None, lease_expires_at=None)
         )
 
-    async def _resolve(
-        self, service_id: uuid.UUID, task_id: uuid.UUID, *, status: str | None
+    async def reclaim_expired(self) -> list[uuid.UUID]:
+        """Release every lapsed lease; return the affected task ids.
+
+        A single atomic UPDATE so concurrent pulls cannot double-claim.
+        """
+        result = await self._conn.execute(
+            update(tasks)
+            .where(
+                tasks.c.locked_by.is_not(None),
+                tasks.c.lease_expires_at <= self._clock(),
+            )
+            .values(locked_by=None, lease_expires_at=None)
+            .returning(tasks.c.id)
+        )
+        return [row.id for row in result.all()]
+
+    async def _release(
+        self, service_id: uuid.UUID, task_id: uuid.UUID
     ) -> None:
-        values: dict[str, Any] = {"locked_by": None, "lease_expires_at": None}
-        if status is not None:
-            values["status"] = status
+        """Clear the lease, but only for the current live-lease holder."""
         result = await self._conn.execute(
             update(tasks)
             .where(
@@ -106,7 +135,7 @@ class SqlBroker:
                 tasks.c.locked_by == service_id,
                 tasks.c.lease_expires_at > self._clock(),
             )
-            .values(values)
+            .values(locked_by=None, lease_expires_at=None)
         )
         if result.rowcount == 0:
             raise DomainError(

@@ -21,10 +21,10 @@ from docket.domain import (
 class ClaimTask:
     """Claim the next pending task for a service (PENDING -> RUNNING).
 
-    Pulls the highest-priority task, confirms the claim with ``ack`` (which
-    transitions it to RUNNING and releases the broker lease), records an
-    Assignment, and marks the service busy. Ownership is then tracked by the
-    Assignment and ``service.busy`` rather than the broker lease.
+    Pulls the highest-priority task — which leases it to the service — then
+    sets it RUNNING, records an Assignment, and marks the service busy. The
+    lease is held for the whole execution (renewed via heartbeat) and released
+    only on complete/fail; a crashed worker's lease lapses and is reclaimed.
     """
 
     def __init__(
@@ -53,7 +53,6 @@ class ClaimTask:
         task = await self._broker.pull(service_id)
         if task is None:
             return None
-        await self._broker.ack(service_id, task.id)
 
         task.status = TaskStatus.RUNNING
         task.attempts += 1

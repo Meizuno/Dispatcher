@@ -66,3 +66,11 @@ class FakeAssignmentRepository:
 
     async def list_active(self) -> list[Assignment]:
         return [a for a in self.items.values() if a.released_at is None]
+
+    async def get_active(self, task_id: uuid.UUID) -> Assignment | None:
+        for assignment in self.items.values():
+            if assignment.released_at is not None:
+                continue
+            if assignment.task_id == task_id:
+                return assignment
+        return None

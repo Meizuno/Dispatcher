@@ -9,12 +9,18 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-from docket.api.dependencies import AssignmentRepo, ServiceRepo, TaskRepo
+from docket.api.dependencies import (
+    AssignmentRepo,
+    BrokerDep,
+    ServiceRepo,
+    TaskRepo,
+)
 from docket.domain import TaskPriority, TaskStatus
 from docket.use_cases import (
     CompleteTask,
     FailTask,
     GetTask,
+    Heartbeat,
     ListPendingTasks,
     SubmitTask,
 )
@@ -51,6 +57,10 @@ class TaskFail(BaseModel):
     error: str
 
 
+class TaskHeartbeat(BaseModel):
+    service_id: uuid.UUID
+
+
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 
 
@@ -76,15 +86,25 @@ async def get_task(task_id: uuid.UUID, tasks: TaskRepo) -> TaskOut:
     return TaskOut.model_validate(task)
 
 
+@router.post("/{task_id}/heartbeat", status_code=204)
+async def heartbeat_task(
+    task_id: uuid.UUID,
+    body: TaskHeartbeat,
+    broker: BrokerDep,
+) -> None:
+    await Heartbeat(broker).execute(body.service_id, task_id)
+
+
 @router.post("/{task_id}/complete")
 async def complete_task(
     task_id: uuid.UUID,
     body: TaskComplete,
+    broker: BrokerDep,
     tasks: TaskRepo,
     services: ServiceRepo,
     assignments: AssignmentRepo,
 ) -> TaskOut:
-    task = await CompleteTask(tasks, services, assignments).execute(
+    task = await CompleteTask(broker, tasks, services, assignments).execute(
         body.service_id, task_id, body.result
     )
     return TaskOut.model_validate(task)
@@ -94,11 +114,12 @@ async def complete_task(
 async def fail_task(
     task_id: uuid.UUID,
     body: TaskFail,
+    broker: BrokerDep,
     tasks: TaskRepo,
     services: ServiceRepo,
     assignments: AssignmentRepo,
 ) -> TaskOut:
-    task = await FailTask(tasks, services, assignments).execute(
+    task = await FailTask(broker, tasks, services, assignments).execute(
         body.service_id, task_id, body.error
     )
     return TaskOut.model_validate(task)

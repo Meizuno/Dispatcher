@@ -30,21 +30,33 @@ class AssignmentRepository(Protocol):
     async def get(self, assignment_id: uuid.UUID) -> Assignment | None: ...
     async def update(self, assignment: Assignment) -> None: ...
     async def list_active(self) -> list[Assignment]: ...
+    async def get_active(self, task_id: uuid.UUID) -> Assignment | None: ...
 
 
 class Broker(Protocol):
     """A pull-based task queue with per-consumer leases.
 
-    A consumer identifies itself on ``pull``; the task is leased to it until
-    it ``ack``s (done) or ``nack``s (returned to the queue). ack/nack take
-    the holder's id so only the lease owner can resolve it. If a consumer
-    crashes, ``requeue_service`` returns all of its in-flight tasks.
+    The broker owns only the lease (``locked_by`` + ``lease_expires_at``); it
+    never changes task status — use cases do, via the TaskRepository. A task
+    is pullable while it is PENDING and not currently leased.
+
+    A consumer identifies itself on ``pull``, which leases the task to it. The
+    lease is held for the whole execution and must be renewed with ``extend``
+    before it expires; an expired lease is reclaimed (the worker is presumed
+    dead). ``ack``/``nack`` release the lease (the use case has already set the
+    terminal/requeued status); both take the holder's id so only the lease
+    owner can resolve it. ``requeue_service`` releases all of a crashed
+    consumer's leases, and ``reclaim_expired`` releases every lapsed lease.
     """
 
     async def enqueue(self, task: Task) -> None: ...
     async def pull(self, service_id: uuid.UUID) -> Task | None: ...
+    async def extend(
+        self, service_id: uuid.UUID, task_id: uuid.UUID
+    ) -> None: ...
     async def ack(self, service_id: uuid.UUID, task_id: uuid.UUID) -> None: ...
     async def nack(
         self, service_id: uuid.UUID, task_id: uuid.UUID
     ) -> None: ...
     async def requeue_service(self, service_id: uuid.UUID) -> None: ...
+    async def reclaim_expired(self) -> list[uuid.UUID]: ...

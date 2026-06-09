@@ -192,3 +192,13 @@ class SqlAssignmentRepository:
             select(assignments).where(assignments.c.released_at.is_(None))
         )
         return [load_assignment(row) for row in result.mappings().all()]
+
+    async def get_active(self, task_id: uuid.UUID) -> Assignment | None:
+        result = await self._conn.execute(
+            select(assignments).where(
+                assignments.c.task_id == task_id,
+                assignments.c.released_at.is_(None),
+            )
+        )
+        row = result.mappings().first()
+        return None if row is None else load_assignment(row)

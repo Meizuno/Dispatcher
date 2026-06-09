@@ -57,13 +57,87 @@ async def test_pull_returns_highest_priority_first(
     assert names == ["high", "normal", "low"]
 
 
-async def test_ack_removes_task_from_queue(conn: AsyncConnection) -> None:
+async def test_ack_releases_the_lease(conn: AsyncConnection) -> None:
+    # The broker only frees the lease; removing the task from the queue is the
+    # use case's job (it sets a terminal status). So a bare ack on a still-
+    # PENDING row makes it pullable again.
     broker = SqlBroker(conn)
     task = Task(name="compute")
     await broker.enqueue(task)
     await broker.pull(SERVICE)
     await broker.ack(SERVICE, task.id)
-    assert await broker.pull(SERVICE) is None  # no longer pending
+    repulled = await broker.pull(OTHER)
+    assert repulled is not None
+    assert repulled.id == task.id
+
+
+async def test_extend_renews_the_lease(conn: AsyncConnection) -> None:
+    clock = FakeClock()
+    broker = SqlBroker(conn, lease_timeout=10.0, clock=clock)
+    task = Task(name="compute")
+    await broker.enqueue(task)
+    await broker.pull(SERVICE)  # lease expires at t+10
+
+    clock.advance(8.0)
+    await broker.extend(SERVICE, task.id)  # now expires at t+18
+    clock.advance(5.0)  # t+13: past the original deadline, before t+18
+
+    assert await broker.pull(OTHER) is None  # still held
+
+
+async def test_extend_by_non_holder_raises(conn: AsyncConnection) -> None:
+    broker = SqlBroker(conn)
+    task = Task(name="compute")
+    await broker.enqueue(task)
+    await broker.pull(SERVICE)
+    with pytest.raises(DomainError):
+        await broker.extend(OTHER, task.id)
+
+
+async def test_extend_after_expiry_raises(conn: AsyncConnection) -> None:
+    clock = FakeClock()
+    broker = SqlBroker(conn, lease_timeout=10.0, clock=clock)
+    task = Task(name="compute")
+    await broker.enqueue(task)
+    await broker.pull(SERVICE)
+
+    clock.advance(11.0)
+
+    with pytest.raises(DomainError):
+        await broker.extend(SERVICE, task.id)
+
+
+async def test_reclaim_expired_frees_lapsed_leases(
+    conn: AsyncConnection,
+) -> None:
+    clock = FakeClock()
+    broker = SqlBroker(conn, lease_timeout=10.0, clock=clock)
+    task = Task(name="compute")
+    await broker.enqueue(task)
+    await broker.pull(SERVICE)
+
+    clock.advance(11.0)
+    reclaimed = await broker.reclaim_expired()
+
+    assert reclaimed == [task.id]
+    repulled = await broker.pull(OTHER)
+    assert repulled is not None
+    assert repulled.id == task.id
+
+
+async def test_reclaim_expired_ignores_live_leases(
+    conn: AsyncConnection,
+) -> None:
+    clock = FakeClock()
+    broker = SqlBroker(conn, lease_timeout=10.0, clock=clock)
+    task = Task(name="compute")
+    await broker.enqueue(task)
+    await broker.pull(SERVICE)
+
+    clock.advance(5.0)  # still within the lease
+
+    assert await broker.reclaim_expired() == []
+    assert await broker.pull(OTHER) is None  # untouched, still held
 
 
 async def test_nack_requeues_the_task(conn: AsyncConnection) -> None:
