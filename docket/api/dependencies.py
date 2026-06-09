@@ -29,6 +29,13 @@ def get_engine() -> AsyncEngine:
     return create_async_engine(get_settings().database_url)
 
 
+def get_max_attempts() -> int:
+    return get_settings().max_attempts
+
+
+MaxAttempts = Annotated[int, Depends(get_max_attempts)]
+
+
 async def get_connection(
     engine: Annotated[AsyncEngine, Depends(get_engine)],
 ) -> AsyncIterator[AsyncConnection]:

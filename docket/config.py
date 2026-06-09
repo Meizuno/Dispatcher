@@ -32,6 +32,8 @@ class Settings(BaseSettings):
         min_length=1,
     )
     log_level: str = Field(default="INFO")
+    # Dispatches a task gets before it is dead-lettered to FAILED.
+    max_attempts: int = Field(default=3, ge=1)
 
     @field_validator("log_level")
     @classmethod

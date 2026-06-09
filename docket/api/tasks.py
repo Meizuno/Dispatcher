@@ -13,6 +13,7 @@ from docket.api.dependencies import (
     AssignmentRepo,
     BrokerDep,
     CurrentService,
+    MaxAttempts,
     ServiceRepo,
     TaskRepo,
 )
@@ -134,8 +135,9 @@ async def fail_task(
     tasks: TaskRepo,
     services: ServiceRepo,
     assignments: AssignmentRepo,
+    max_attempts: MaxAttempts,
 ) -> TaskOut:
-    task = await FailTask(broker, tasks, services, assignments).execute(
-        service.id, task_id, body.error
-    )
+    task = await FailTask(
+        broker, tasks, services, assignments, max_attempts=max_attempts
+    ).execute(service.id, task_id, body.error)
     return TaskOut.model_validate(task)

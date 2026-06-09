@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 
 from docket.api import services, tasks
 from docket.api.dependencies import get_engine
+from docket.config import get_settings
 from docket.domain import DomainError
 from docket.infrastructure import (
     SqlAssignmentRepository,
@@ -46,6 +47,7 @@ async def _reap_expired(engine: AsyncEngine, interval: float) -> None:
                     SqlTaskRepository(conn),
                     SqlServiceRepository(conn),
                     SqlAssignmentRepository(conn),
+                    max_attempts=get_settings().max_attempts,
                 ).execute()
             if reclaimed:
                 logger.warning("reclaimed %d expired task(s)", len(reclaimed))

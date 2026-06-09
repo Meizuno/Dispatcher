@@ -120,6 +120,27 @@ async def test_fail_requeues_under_budget(
     assert reclaim["id"] == task["id"]
 
 
+async def test_fail_exhausts_retries_to_dead_letter(
+    client: httpx.AsyncClient, register: Register
+) -> None:
+    _service, headers = await register("w")
+    task = (await client.post("/tasks", json={"name": "compute"})).json()
+
+    statuses = []
+    for _ in range(3):  # default budget is 3 dispatches
+        await client.post("/tasks/claim", headers=headers)
+        failed = await client.post(
+            f"/tasks/{task['id']}/fail",
+            json={"error": "boom"},
+            headers=headers,
+        )
+        statuses.append(failed.json()["status"])
+
+    assert statuses == ["pending", "pending", "failed"]
+    # dead-lettered: no longer pullable
+    assert (await client.post("/tasks/claim", headers=headers)).json() is None
+
+
 async def test_cannot_complete_another_services_task(
     client: httpx.AsyncClient, register: Register
 ) -> None:
