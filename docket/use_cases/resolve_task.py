@@ -25,10 +25,14 @@ a lost delivery is a real attempt. The recorded error distinguishes the cause
 """
 
 
-async def _load(tasks: TaskRepository, task_id: uuid.UUID) -> Task:
+async def _running_task(tasks: TaskRepository, task_id: uuid.UUID) -> Task:
     task = await tasks.get(task_id)
     if task is None:
         raise DomainError(f"task {task_id} does not exist")
+    if task.status is not TaskStatus.RUNNING:
+        # release() already authorized; a live lease should imply RUNNING.
+        # Guard that invariant instead of driving a stray task to terminal.
+        raise DomainError(f"task {task_id} is not running")
     return task
 
 
@@ -80,7 +84,7 @@ class CompleteTask:
         result: dict[str, Any] | None = None,
     ) -> Task:
         await self._broker.release(service_id, task_id)  # authorize + release
-        task = await _load(self._tasks, task_id)
+        task = await _running_task(self._tasks, task_id)
         task.status = TaskStatus.SUCCEEDED
         task.result = result
         task.updated_at = datetime.now(UTC)
@@ -121,7 +125,7 @@ class FailTask:
         error: str,
     ) -> Task:
         await self._broker.release(service_id, task_id)  # authorize + release
-        task = await _load(self._tasks, task_id)
+        task = await _running_task(self._tasks, task_id)
         task.error = f"failed: {error}"
         task.updated_at = datetime.now(UTC)
         if task.attempts < self._max_attempts:

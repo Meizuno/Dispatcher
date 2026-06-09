@@ -147,6 +147,28 @@ async def test_complete_non_running_task_is_rejected(
         )
 
 
+async def test_complete_rejects_leased_non_running_task(
+    conn: AsyncConnection,
+) -> None:
+    # Lease without the paired RUNNING write (ClaimTask normally does both).
+    # The live lease authorizes release, but the RUNNING guard then rejects,
+    # so the task is not driven to a terminal state.
+    broker, tasks, services, assignments = _repos(conn)
+    service = await _register(conn)
+    task = Task(name="compute")
+    await broker.enqueue(task)
+    leased = await broker.pull(service.id)  # leased, still PENDING
+    assert leased is not None
+
+    with pytest.raises(DomainError):
+        await CompleteTask(broker, tasks, services, assignments).execute(
+            service.id, task.id, {"value": 42}
+        )
+    current = await tasks.get(task.id)
+    assert current is not None
+    assert current.status is TaskStatus.PENDING  # not driven to SUCCEEDED
+
+
 async def test_complete_after_lease_lost_is_rejected_without_rollback(
     conn: AsyncConnection,
 ) -> None:
