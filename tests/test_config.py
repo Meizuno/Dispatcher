@@ -4,7 +4,8 @@ from pydantic import ValidationError
 
 
 def test_defaults() -> None:
-    settings = Settings()
+    # _env_file=None so a developer's local .env can't mask the code defaults.
+    settings = Settings(_env_file=None)
     assert settings.app_name == "docket"
     assert settings.database_url.startswith("postgresql+asyncpg://")
     assert settings.log_level == "INFO"
