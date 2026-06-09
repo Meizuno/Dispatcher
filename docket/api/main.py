@@ -5,10 +5,10 @@ from __future__ import annotations
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from dispatcher.api import services, tasks
-from dispatcher.domain import DomainError
+from docket.api import services, tasks
+from docket.domain import DomainError
 
-app = FastAPI(title="Dispatcher")
+app = FastAPI(title="Docket")
 
 
 @app.exception_handler(DomainError)

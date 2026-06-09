@@ -1,6 +1,6 @@
 import pytest
-from dispatcher.domain import DomainError, ServiceStatus
-from dispatcher.use_cases import RegisterService
+from docket.domain import DomainError, ServiceStatus
+from docket.use_cases import RegisterService
 
 from tests.fakes import FakeServiceRepository
 

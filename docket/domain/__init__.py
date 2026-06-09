@@ -1,7 +1,7 @@
 """Domain layer: models, ports, and exceptions."""
 
-from dispatcher.domain.exceptions import DomainError, InvalidStateTransition
-from dispatcher.domain.models import (
+from docket.domain.exceptions import DomainError, InvalidStateTransition
+from docket.domain.models import (
     Assignment,
     Service,
     ServiceStatus,
@@ -9,7 +9,7 @@ from dispatcher.domain.models import (
     TaskPriority,
     TaskStatus,
 )
-from dispatcher.domain.ports import (
+from docket.domain.ports import (
     AssignmentRepository,
     Broker,
     ServiceRepository,

@@ -3,7 +3,7 @@ from collections.abc import Iterator
 from datetime import UTC, datetime
 
 import pytest
-from dispatcher.domain import (
+from docket.domain import (
     Assignment,
     AssignmentRepository,
     Service,
@@ -13,7 +13,7 @@ from dispatcher.domain import (
     TaskRepository,
     TaskStatus,
 )
-from dispatcher.infrastructure import (
+from docket.infrastructure import (
     SqliteAssignmentRepository,
     SqliteServiceRepository,
     SqliteTaskRepository,

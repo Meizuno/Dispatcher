@@ -5,7 +5,7 @@ from __future__ import annotations
 from collections.abc import Mapping
 from typing import Any
 
-from dispatcher.domain import DomainError, Task, TaskPriority, TaskRepository
+from docket.domain import DomainError, Task, TaskPriority, TaskRepository
 
 
 class SubmitTask:

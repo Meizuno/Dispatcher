@@ -1,6 +1,6 @@
 """Application configuration via pydantic-settings.
 
-Values load from environment variables (prefix ``DISPATCHER_``) or a .env
+Values load from environment variables (prefix ``DOCKET_``) or a .env
 file, falling back to the defaults below. Validation is fail-fast: building
 Settings (e.g. via get_settings at startup) raises ValidationError on any
 invalid value rather than letting it surface later.
@@ -17,17 +17,17 @@ _LOG_LEVELS = {"DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"}
 
 
 class Settings(BaseSettings):
-    """Base settings for the dispatcher."""
+    """Base settings for Docket."""
 
     model_config = SettingsConfigDict(
-        env_prefix="DISPATCHER_",
+        env_prefix="DOCKET_",
         env_file=".env",
         env_file_encoding="utf-8",
         extra="ignore",
     )
 
-    app_name: str = Field(default="dispatcher", min_length=1)
-    database: str = Field(default="dispatcher.db", min_length=1)
+    app_name: str = Field(default="docket", min_length=1)
+    database: str = Field(default="docket.db", min_length=1)
     log_level: str = Field(default="INFO")
 
     @field_validator("log_level")

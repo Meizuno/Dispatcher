@@ -1,7 +1,7 @@
 import uuid
 
-from dispatcher.domain import Task, TaskStatus
-from dispatcher.use_cases import GetTask, ListPendingTasks, SubmitTask
+from docket.domain import Task, TaskStatus
+from docket.use_cases import GetTask, ListPendingTasks, SubmitTask
 
 from tests.fakes import FakeTaskRepository
 

@@ -1,5 +1,5 @@
 import pytest
-from dispatcher.core import Dispatcher
+from docket.core import Dispatcher
 
 from tests.fakes import (
     FakeAssignmentRepository,

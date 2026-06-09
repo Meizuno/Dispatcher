@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import threading
 
-from dispatcher.domain import Task
+from docket.domain import Task
 
 
 class InMemoryBroker:

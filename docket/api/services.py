@@ -8,9 +8,9 @@ from datetime import datetime
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
 
-from dispatcher.api.dependencies import ServiceRepo
-from dispatcher.domain import ServiceStatus
-from dispatcher.use_cases import GetService, ListServices, RegisterService
+from docket.api.dependencies import ServiceRepo
+from docket.domain import ServiceStatus
+from docket.use_cases import GetService, ListServices, RegisterService
 
 
 class ServiceCreate(BaseModel):

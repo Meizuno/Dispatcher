@@ -2,12 +2,35 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: ['**']
   pull_request:
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
-  test:
+  check:
+    name: ${{ matrix.check.name }}
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        check:
+          - name: test
+            run: pytest -W error
+          - name: lint
+            run: |
+              ruff check docket tests
+              ruff format --check docket tests
+          - name: types
+            run: mypy docket tests
+          - name: spell
+            run: codespell --skip="*.lock,.git,__pycache__,.venv,*.egg-info,.pytest_cache,.mypy_cache,.ruff_cache,.claude"
+          - name: security
+            run: |
+              pip-audit --skip-editable
+              pip-licenses --fail-on="GPL;LGPL;AGPL"
     steps:
       - uses: actions/checkout@v4
 
@@ -22,23 +45,5 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
-      - name: Pytest
-        run: pytest -W error
-
-      - name: Ruff lint
-        run: ruff check dispatcher tests
-
-      - name: Ruff format check
-        run: ruff format --check dispatcher tests
-
-      - name: Mypy
-        run: mypy dispatcher tests
-
-      - name: Codespell
-        run: codespell --skip="*.lock,.git,__pycache__,.venv,*.egg-info,.pytest_cache,.mypy_cache,.ruff_cache,.claude"
-
-      - name: pip-audit
-        run: pip-audit --skip-editable
-
-      - name: License audit
-        run: pip-licenses --fail-on="GPL;LGPL;AGPL"
+      - name: ${{ matrix.check.name }}
+        run: ${{ matrix.check.run }}

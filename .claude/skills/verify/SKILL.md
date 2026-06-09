@@ -22,8 +22,8 @@ Expected: all tests pass with **0 warnings**. If a deprecation warning appears, 
 ### 2. Linter — must be clean
 
 ```sh
-ruff check dispatcher tests
-ruff format --check dispatcher tests
+ruff check docket tests
+ruff format --check docket tests
 ```
 
 Expected: `All checks passed!` and `N files already formatted`. Ruff covers style, import sorting (I), bug patterns (B), security (S), pyupgrade (UP), and pytest style (PT). Configuration is in [`pyproject.toml`](../../../pyproject.toml) under `[tool.ruff]`. Do **not** add `# noqa: ...` to silence — fix the underlying issue. Per-line `# noqa: <code>` is acceptable only for a genuine false positive and must carry a one-line comment explaining why.
@@ -31,7 +31,7 @@ Expected: `All checks passed!` and `N files already formatted`. Ruff covers styl
 ### 3. Type checker — must be clean
 
 ```sh
-mypy dispatcher tests
+mypy docket tests
 ```
 
 Expected: `Success: no issues found`. mypy is configured `strict = true` in [`pyproject.toml`](../../../pyproject.toml) under `[tool.mypy]`, with a loosened override for `tests.*` that skips "missing return annotation" noise and `strict_equality` (enum-identity asserts), while keeping real correctness signals (union-attr, no-any-return, attr-defined, call-arg). Do **not** add `# type: ignore[...]` to silence — fix the underlying type.

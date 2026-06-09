@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
-from dispatcher.domain import (
+from docket.domain import (
     Assignment,
     AssignmentRepository,
     Service,
