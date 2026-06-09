@@ -1,7 +1,7 @@
 """Infrastructure layer: concrete adapters for the domain ports."""
 
-from dispatcher.infrastructure.broker import InMemoryBroker
-from dispatcher.infrastructure.sqlite import (
+from docket.infrastructure.broker import InMemoryBroker
+from docket.infrastructure.sqlite import (
     SqliteAssignmentRepository,
     SqliteServiceRepository,
     SqliteTaskRepository,

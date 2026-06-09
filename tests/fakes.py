@@ -2,7 +2,7 @@
 
 import uuid
 
-from dispatcher.domain import Assignment, Service, Task, TaskStatus
+from docket.domain import Assignment, Service, Task, TaskStatus
 
 
 class FakeTaskRepository:

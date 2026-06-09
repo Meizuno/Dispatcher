@@ -1,6 +1,6 @@
 import pytest
-from dispatcher.domain import DomainError, TaskPriority, TaskStatus
-from dispatcher.use_cases import SubmitTask
+from docket.domain import DomainError, TaskPriority, TaskStatus
+from docket.use_cases import SubmitTask
 
 from tests.fakes import FakeTaskRepository
 

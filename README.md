@@ -1,4 +1,4 @@
-# Dispatcher
+# Docket
 
 A clean Python project base.
 
@@ -15,14 +15,14 @@ pip install -e ".[dev]"
 ```powershell
 ruff check .        # lint
 ruff format .       # format
-mypy dispatcher     # type check
+mypy docket         # type check
 pytest              # tests
 ```
 
 ## Layout
 
 ```
-dispatcher/         # application package
-tests/              # test suite (mirrors dispatcher/)
+docket/             # application package
+tests/              # test suite (mirrors docket/)
 pyproject.toml      # dependencies + tool config
 ```

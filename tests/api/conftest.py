@@ -3,8 +3,8 @@ from pathlib import Path
 
 import httpx
 import pytest
-from dispatcher.api.main import app
-from dispatcher.config import Settings, get_settings
+from docket.api.main import app
+from docket.config import Settings, get_settings
 
 
 @pytest.fixture

@@ -8,8 +8,8 @@ from typing import Annotated
 
 from fastapi import Depends
 
-from dispatcher.config import Settings, get_settings
-from dispatcher.infrastructure import (
+from docket.config import Settings, get_settings
+from docket.infrastructure import (
     SqliteServiceRepository,
     SqliteTaskRepository,
     connect,

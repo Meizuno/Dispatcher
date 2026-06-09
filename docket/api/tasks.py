@@ -9,9 +9,9 @@ from typing import Any
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
-from dispatcher.api.dependencies import TaskRepo
-from dispatcher.domain import TaskPriority, TaskStatus
-from dispatcher.use_cases import GetTask, ListPendingTasks, SubmitTask
+from docket.api.dependencies import TaskRepo
+from docket.domain import TaskPriority, TaskStatus
+from docket.use_cases import GetTask, ListPendingTasks, SubmitTask
 
 
 class TaskCreate(BaseModel):

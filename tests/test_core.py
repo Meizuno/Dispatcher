@@ -1,5 +1,5 @@
-from dispatcher.core import Dispatcher
-from dispatcher.domain import (
+from docket.core import Dispatcher
+from docket.domain import (
     Service,
     ServiceStatus,
     Task,
