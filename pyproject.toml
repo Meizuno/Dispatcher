@@ -64,6 +64,11 @@ strict_equality = false
 module = "testcontainers.*"
 ignore_missing_imports = true
 
+[tool.codespell]
+# "crasher"/"crashers" are domain terms in the load-test harness (a worker
+# that deliberately crashes), not misspellings.
+ignore-words-list = "crasher,crashers"
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
