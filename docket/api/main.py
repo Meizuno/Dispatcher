@@ -10,6 +10,7 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import AsyncEngine
 
 from docket.api import services, tasks
@@ -77,6 +78,18 @@ async def handle_domain_error(
     request: Request, exc: Exception
 ) -> JSONResponse:
     return JSONResponse(status_code=400, content={"detail": str(exc)})
+
+
+@app.get("/health")
+async def health() -> JSONResponse:
+    """Readiness probe: 200 when the database answers, 503 otherwise."""
+    try:
+        async with get_engine().connect() as conn:
+            await conn.execute(text("SELECT 1"))
+    except Exception:
+        logger.exception("health check failed")
+        return JSONResponse(status_code=503, content={"status": "unhealthy"})
+    return JSONResponse(status_code=200, content={"status": "ok"})
 
 
 app.include_router(tasks.router)
